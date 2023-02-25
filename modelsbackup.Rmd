@@ -1,0 +1,378 @@
+---
+title: "ST404 Assignment 3"
+author: "Student ID: 1714796"
+output: pdf_document
+linestretch: 1.5
+fontsize: 11pt
+header-includes:
+   - \usepackage{bbold}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, warning=FALSE,message=FALSE,results='hide'}
+
+load("~/R/bikedata2011.rda")
+load("~/R/bikedata2012.rda")
+
+install.packages("DataExplorer", repos ="http://cran.us.r-project.org")
+install.packages("kableExtra", repos ="http://cran.us.r-project.org")
+install.packages("car", repos ="http://cran.us.r-project.org")
+install.packages("glmnet", repos = "http://cran.us.r-project.org")
+install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+install.packages("factoextra", repos = "http://cran.us.r-project.org")
+install.packages("ggpubr", repos = "http://cran.us.r-project.org")
+install.packages("GGally", repos = "http://cran.us.r-project.org")
+install.packages("MASS", repos = "http://cran.us.r-project.org")
+install.packages("dplyr", repos = "http://cran.us.r-project.org")
+install.packages("knitr", repos = "http://cran.us.r-project.org")
+install.packages("dummies", repos = "http://cran.us.r-project.org")
+install.packages("pls", repos = "http://cran.us.r-project.org")
+install.packages("pscl", repos = "http://cran.us.r-project.org")
+install.packages("caret", repos = "http://cran.us.r-project.org")
+install.packages("lmtest")
+install.packages("e1071")
+install.packages("performance")
+install.packages("broom")
+library(glmnet)
+library(pls)
+library(factoextra)
+library(ggplot2)
+library(car)
+library(knitr)
+library(kableExtra)
+library(GGally)
+library(dplyr)
+library(MASS)
+library(ggpubr)
+library(dummies)
+library(DataExplorer)
+library(pscl)
+library(caret)
+library(lmtest)
+library(e1071)
+library(performance)
+library(broom)
+```
+
+\newpage
+Executive summary
+
+The objective is to build up a model that can predict the numbers of bikes being rented at any given time. Hourly data pertaining to bike rentals in 2011 and 2012 has been collected, along with various envirionmental conditions. The 2012 data will be used to train the model and the 2012 data to test it.
+
+The objective of our study was to investigate how the shucked weight of an abalone is related to its dimensions, gender, maturity and other weight-based variables.
+Our analysis demonstrates that the gender and maturity of the abalone had negligible influence on its shucked weight. However, this was only apparent when we considered its weight and dimension variables.
+In conclusion, our investigation indicates that the shucked weight of an abalone is most conveniently and accurately estimated by its height and whole weight.
+
+\newpage
+# Findings
+
+Clearly a linear relationship between whole weight and shucked weight can be seen. Since, shucked weight is a component of whole weight, their interrelation is obvious. Thus, if seeking to maximise the shucked weight of an abalone, it is advised to choose the abalone with the highest whole weights.
+
+```{r}
+#graph whole_weight vs shucked_weight
+```
+
+From the box plot below, it can be seen that the shucked weight of the male and female abalone is almost equal in mean and interquartile range, but with male abalone having marginally higher quartiles. However, the infant abalone clearly have a much lower median shucked weight than both male and female adults.
+We can deduce that the shucked weight of the abalone is independent of its gender, but related to its maturity. Although the maturity of an abalone is linked to its shucked weight, it is interesting to check whether we can predict shucked weight without it. The graphs below depicts how close our models of shucked weight are to our observations.
+
+```{r}
+#boxplot
+```
+
+```{r}
+#Residual plot and figure 1: without maturity
+```
+
+The two graphs are almost indistinguishable, so maturity is not critical for the prediction shucked weight.
+Our statistical analysis of the dimension variables has indicated that we can justify ignoring the diameter of an abalone when attempting to model its shucked weight. The intuitive explanation is that each abalone is similar in shape, but varies in size. Thus the ratio between each of the dimension variables should remain relatively fixed. In turns out that we can describe diameter and length as being collinear (see Statistical Methodology).
+
+\newpage
+# Statistical Methodology
+
+These data are taken from the dataset available on the UCI web site^[1]^ maintained by Blake and Merz(1998)^[2]^ . The original owner of the dataset are Marine Resources Division Marine Research Laboratories^[3]^ but the data were donated to UCI by: Sam Waugh^[4]^ and used by him (amongst others) in Waugh (1995)^[5]^. 
+
+## Exploratory Data Analysis
+
+In order to fit regression models on the data and find the relationship between the different variables and specifically the shucked weight of the abalones, we first conducted our data cleaning process.
+
+After summarising the data we found that `GenderMat` is a categorical variable and the rest are continuous variables.
+
+We observe that the minimum value of the `Height` variable is 0. Scrutinising the data for possible missing values of `Height` that might have been labelled as 0, we isolated two "Infant" data points whith have zero height. In the context of the data, it seems that their height values have been misrecorded so we exclude them from our observations.
+
+```{r cleaning1}
+abalone <- subset(abalone , abalone$Height!=0)
+```
+
+We continued by checking for bias towards any gender or maturity category didn't find any evidence to suggest this being the case.
+
+Scrutinising the Weight and dimension variables, we found 4 points have abalones with meat weight greater than whole weight. Moreover, we have points whereby the combined shell and meat weight is higher than the whole weight. This is not logically possible, so we exclude those points from our dataset.
+
+```{r cleaning2}
+abalone <- subset(abalone, abalone$Whole_weight>abalone$Shucked_weight)
+abalone <- subset(abalone, abalone$Whole_weight>abalone$Shucked_weight+abalone$Shell_weight)
+```
+
+We also note that there is one point where the diameter of the shell is higher than the length which, in our data, is supposed to be the longest shell measurement. Hence, we removed this data point.
+
+```{r cleaning3}
+abalone <- subset(abalone, abalone$Length>abalone$Diameter)
+```
+
+Finally there is a height value of greater than 150mm that is much higher than the maximum length and diameter. This much be a misrecorded value since it is not physically possible for an abalone to have such dimensions.
+
+```{r cleaning4, echo=TRUE}
+abalone <- subset(abalone, abalone$Height<150)
+```
+
+We are left with 4157 data points after the cleaning process. 
+
+## Relationship between variables
+
+```{r pair-plot, fig.height=5, fig.width=8}
+ggpairs(abalone, columns = 2:8, title="Figure 1:Pair plots of variables categorised by GenderMat", ggplot2::aes(color=GenderMat), axisLabels = "none", switch = "both", upper = list(continuous = wrap("cor", size=3)))
+```
+
+In the above diagram, we can see all of the variables are highly correlated with shucked weight, with 'Length' and 'Whole_weight' having the highest correlations. 
+
+We can also observe from the diagram that dimensions have a remarkably linear relationship between each other, and so do the weight variables. The high correlation between them is expected in the sense that abalones which have a larger shell will most likely have more meat and weigh more.
+
+## Regression analysis
+
+Modeling by adding variables iteratively, we initially used the other weight variables as predictors for shucked weight, since they are the most highly correlated with the shucked weight.
+
+$$\text{ShuckedWeight} = \alpha + \beta_1 \text{WholeWeight} + \beta_2 \text{VisceraWeight} + \beta_3 \text{ShellWeight} + \epsilon \tag{Model 1}$$
+
+```{r model1, fig.height=4, fig.width=4}
+WModel1<-lm(Shucked_weight~Whole_weight+Viscera_weight+Shell_weight,data = abalone)
+plot(fitted(WModel1), residuals(WModel1), main = "Model 1 residual plot", xlab = "Fitted values", ylab = "Residuals", cex.main=0.75, cex.lab=0.7, cex.axis=0.5)
+abline(0,0, col="red", lty="dotted")
+```
+
+The above plot indicates, the model is violating an assumption of linear regression, that is, the residuals are heteroskedastic.
+
+Confirming this using the Breusch-Pagan test:
+
+```{r ncvTest1, echo=TRUE}
+ncvTest(WModel1)
+```
+The p-value of the test is less than 0.05, which means that there is evidence to reject the null hypothesis (that the variance of errors is constant).
+
+In order to solve this, we looked into the cause of the heteroskedasticity. From **Figure 1**, the plot of shucked weight against shell weight suggests that higher shell weight leads to higher variances. Applying the Weighted Least Squares method suggested by Sheather(2009)^[6]^ and Frost J.
+^[7]^, we conclude that we need to assign lower weights to data points with high shell weight in our model. Hence, we need to assign lower weights to data points with high shell weight in our model. We used the weights $1/(\text{ShellWeight}^2)$ on our original model to obtain Model 2.
+
+```{r model2, fig.height=4, fig.width=4}
+w <- 1/(abalone$Shell_weight)^2
+WModel2<-lm(Shucked_weight~Whole_weight+Viscera_weight+Shell_weight,data = abalone, weights = w)
+
+plot(fitted(WModel2), rstandard(WModel2), main = "Model 2 residual plot", xlab = "Fitted values", ylab = "Standardised Residuals", cex.main=0.75, cex.lab=0.7, cex.axis=0.5)
+abline(0,0, col="red", lty="dotted")
+```
+
+The standardised residual plot of Model 2 shows more homoskedasticity than previously. We can now analyse the coefficients of this model:
+
+```{r summary weights}
+kable(summary(WModel2)$coefficients, caption = "Coefficients summary of Model 2", booktabs = T)  %>%
+kable_styling(latex_options = c("striped", "hold_position"), font_size = 7.5)
+```
+All three weight variables appear to be significant. However, the coefficients show a negative relationship between meat weight and shell and viscera weights, the opposite of what was suggested by **Figure 1**. 
+
+We continued with a simple regression model using only the length variables as predictors for shucked weight:
+
+$$
+ \text{ShuckedWeight} = \alpha + \beta_1     \text{Length} + \beta_2 \text{Diameter} + \beta_3 \text{Height} + \epsilon \tag{Model 3}
+$$
+```{r model3, fig.height=3, fig.width=4}
+Model3<-lm(Shucked_weight~Length+Diameter+Height,data = abalone)
+plot(fitted(Model3), rstandard(Model3), main = "Model 3 residual plot", xlab = "Fitted values", ylab = "Standardised Residuals", cex.main=0.75, cex.lab=0.7, cex.axis=0.5)
+abline(0,0, col="red", lty="dotted")
+```
+
+The above model clearly shows issues with the model assumptions of heteroskedasticity and linearity. To solve this we used the Box Tidwell maximum likelihood suggested power transformations on the predictors and log transformation on the response as detailed below, obtaining the following residual plot:
+
+$$\text{log(ShuckedWeight)} = \alpha + \beta_1 \text{Length} + \beta_2 \text{Length}^2 + \beta_3 \text{Length}^3+ \beta_4 \text{Diameter} + \beta_5 \text{Diameter}^2 + \beta_6 \text{Diameter}^3+ \\
+\beta_7 \text{Diameter}^4 \beta_8 \text{Height} + \epsilon \tag{Model 4}$$
+
+```{r model4, fig.height=3, fig.width=4}
+Model4<-lm(log(Shucked_weight)~Length+I(Length^2)+I(Length^3)+Diameter+I(Diameter^2)+I(Diameter^3)+I(Diameter^4)+Height,data = abalone)
+plot(fitted(Model4), rstandard(Model4), main = "Model 4 residual plot", xlab = "Fitted values", ylab = "Standardised Residuals", cex.main=0.75, cex.lab=0.7, cex.axis=0.5)
+abline(0,0, col="red", lty="dotted")
+```
+
+This residual plot is now far more homoskedastic and the linearity assumption is being adhered to.
+
+```{r summary Dimensions}
+kable(summary(Model4)$coefficients, caption = "Coefficients summary of Model 4", booktabs = T)  %>%
+kable_styling(latex_options = c("striped", "hold_position"), font_size = 7.5)
+```
+The coefficients of this model are all significant however there appears to be some evidence of multicollinearity as in model 2. 
+*(comb)*
+In our analysis, we have decided to create dummy variables for Gender and Maturity so we can treat them as separate categories. We are now going to combine the above two analysis of dimensions and weight into a single model, with gender and maturity varriables, and apply weighted regression:
+
+$$\text{log(ShuckedWeight)} = \alpha + \beta_1 \text{Length} + \beta_2 \text{Length}^2 + \beta_3 \text{Length}^3+ \beta_4 \text{Diameter} + \beta_5 \text{Diameter}^2 + \beta_6 \text{Diameter}^3+ \\
+\beta_7 \text{Diameter}^4 + \beta_8 \text{Height} + \beta_9 \text{WholeWeight} + \beta_{10} \text{VisceraWeight} + \beta_{11} \text{ShellWeight}+\\
+\beta_{12} \mathbb{1}_{GenderMat="F"} + \beta_{13} \mathbb{1}_{GenderMat="I"} + \epsilon \tag{Model 5}$$
+
+```{r model5, fig.height=4, fig.width=4}
+w <- 1/(abalone$Shell_weight)^2
+Gender <- ifelse(abalone$GenderMat=="F",1,0)
+Maturity <- ifelse(abalone$GenderMat== c("F","M"),1,0)
+Maturity <- factor(Maturity, levels = c(0,1), labels = c("Infant", "Adult"))
+abalone <- cbind(abalone, Gender, Maturity)
+Model5 <-lm(Shucked_weight~Length+I(Length^2)+I(Length^3)+Diameter+I(Diameter^2)+I(Diameter^3)+I(Diameter^4)+Height+Whole_weight+Viscera_weight+Shell_weight+Gender+Maturity,data = abalone, weights = w)
+
+plot(fitted(Model5), rstandard(Model5), main = "Model 5 standard residual plot", xlab = "Fitted values", ylab = "Standardised Residuals", cex.main=0.75, cex.lab=0.7, cex.axis=0.5)
+abline(0,0, col="red", lty="dotted")
+```
+
+```{r summary1 Dimensions and weights}
+kable(summary(Model5)$coefficients, caption = "Coefficients summary of Model 5", booktabs = T)  %>%
+kable_styling(latex_options = c("striped", "hold_position"), font_size = 7.5)
+```
+
+We remove all the diameter values, Length^[3]^ and Maturity variables since they are not significant. 
+
+Our new model is summarised below:
+
+$$\text{log(ShuckedWeight)} = \alpha + \beta_1 \text{Length} + \beta_2 \text{Length}^2 + \beta_3 \text{Height} + \beta_4 \text{WholeWeight} + \beta_5 \text{VisceraWeight} +\\
+\beta_6 \text{ShellWeight} +
+\beta_{12} \mathbb{1}_{GenderMat="F"} + \epsilon \tag{Model 6}$$
+
+```{r summary2 Dimensions and weights}
+Model6<-lm(Shucked_weight~Length+I(Length^2)+Height+Whole_weight+Viscera_weight+Shell_weight+Gender,data = abalone,weights = w)
+kable(summary(Model6)$coefficients, caption = "Coefficients summary of Model 6", booktabs = T)  %>%
+kable_styling(latex_options = c("striped", "hold_position"), font_size = 7.5)
+```
+We note that two of the weight variables still have negative coefficients, suggesting that we need to take care of multicollinearity.
+
+
+
+\newpage
+# References
+
+^[1]^   http://www.ncc.up.pt/~ltorgo/Regression/DataSets.html 
+^[2]^   Blake, C.L. & Merz, C.J. (1998). UCI Repository of machine learning databases [http://www.ics.uci.edu/~mlearn/MLRepository.html]. Irvine, CA: University of California, Department of Information and Computer Science.
+^[3]^   Marine Resources Division Marine Research Laboratories - Taroona Department of Primary Industry and Fisheries, Tasmania GPO Box 619F, Hobart, Tasmania 7001, Australia (contact: Warwick Nash +61 02 277277, wnash\@dpi.tas.gov.au) 
+^[4]^   Sam Waugh (Sam.Waugh\@cs.utas.edu.au) Department of Computer Science, University of Tasmania GPO Box 252C, Hobart, Tasmania 7001, Australia
+^[5]^    Waugh S (1995) "Extending and benchmarking Cascade-Correlation", PhD thesis, Computer Science Department, University of Tasmania.
+^[6]^    Sheather S. (2009) "A Modern Approach to Regression with R"
+^[7]^    Frost J. https://statisticsbyjim.com/regression/heteroscedasticity-regression/
+
+\newpage
+# Appendix
+#summary of abalone data
+
+abalone <- abalone404
+abalone$GenderMat <- ordered(abalone$GenderMat, levels=c("I","F","M"))
+kable(summary(abalone), caption = "Original summary statistics", booktabs = T)  %>%
+  kable_styling(latex_options = c("striped", "hold_position", "scale_down"), font_size = 7.5)
+
+#Missing Height Values
+
+kable(abalone[abalone$Height==0,], booktabs = T) %>%
+  kable_styling(latex_options = "scale_down", font_size = 7.5)
+
+#Cleaning missing Height Values
+abalone <- subset(abalone , abalone$Height!=0)
+
+#Sample bias check with violin and box plots
+count <- ggplot(abalone, aes(GenderMat, color=GenderMat)) + geom_bar(width=.7, fill="white") 
++ scale_color_brewer(palette="Dark2") + ggtitle('Count of data points \n per GenderMat \n category') 
++ theme(text = element_text(size=7), legend.position="none", plot.title = element_text(size=7, hjust = 0.5, face = "bold"))
+
+dist <- ggplot(abalone, aes(GenderMat, Shucked_weight, color=GenderMat)) + geom_violin(alpha=0.5, color="gray")
++geom_jitter(alpha=0.5, aes(color=GenderMat), position = position_jitter(width = 0.1)) + scale_color_brewer(palette="Dark2") 
++ ggtitle('Distribution of \n Shucked_weight per \n GenderMat category') 
++ theme(text = element_text(size=7), legend.position="none", plot.title = element_text(size=7, hjust = 0.5, face = "bold"))
+
+library(gridExtra)
+grid.arrange(count, dist, ncol=2)
+
+#Weight variable relationship plot to remove erronious data points
+plot1 <- ggplot(abalone, aes(Whole_weight, Shucked_weight, color=GenderMat)) + geom_point() 
++ geom_abline(slope = 1, intercept = 0) + ggtitle('Meat weight against whole weight') 
++  scale_color_brewer(palette="Dark2") + theme(text = element_text(size=7), plot.title = element_text(size=7, hjust = 0.5, face = "bold"))
+
+plot2 <- ggplot(abalone, aes(Whole_weight, Shucked_weight+Shell_weight, color=GenderMat)) + geom_point() 
++ geom_abline(slope = 1, intercept = 0) + ggtitle('Meat weight plus shell weight against whole weight') 
++  scale_color_brewer(palette="Dark2") + theme(text = element_text(size=7), plot.title = element_text(size=7, hjust = 0.5, face = "bold"), legend.position = "none")
+
+#Further cleaning for incorrect Weight variables
+abalone <- subset(abalone, abalone$Whole_weight>abalone$Shucked_weight)
+abalone <- subset(abalone, abalone$Whole_weight>abalone$Shucked_weight+abalone$Shell_weight)
+
+#Plot to check issues with Length and Diameter Variables
+ggplot(abalone, aes(Diameter, Length, color=GenderMat)) + geom_point() + geom_abline(slope = 1, intercept = 0) + ggtitle('Length of shell against diameter') +  scale_color_brewer(palette="Set1") + theme(text = element_text(size=7), plot.title = element_text(size=7, hjust = 0.5, face = "bold"))
+
+#Cleaning data for Length<Diameter
+abalone <- subset(abalone, abalone$Length>abalone$Diameter)
+
+#Final check on whether our variables contain visible outliers or misrecorded points with boxplots of our continuous variables
+aba1 <- data.frame(name=c(rep("Length",4158), rep("Diameter",4158), rep("Height",4158)), value=c(abalone$Length, abalone$Diameter, abalone$Height))
+dim <- ggplot(aba1, aes(x=name, y=value, fill=name)) +geom_boxplot() + ggtitle('Dimensions boxplots') + xlab("") + ylab("") + theme(text = element_text(size=7), legend.position="none", plot.title = element_text(size=7, hjust = 0.5, face = "bold"))
+aba2 <- data.frame(name=c(rep("Whole_weight",4158), rep("Viscera_weight",4158), rep("Shell_weight",4158),rep("Shucked_weight",4158)), value=c(abalone$Whole_weight, abalone$Viscera_weight, abalone$Shell_weight, abalone$Shucked_weight))
+weight <- ggplot(aba2, aes(x=name, y=value, fill=name)) +geom_boxplot() + ggtitle('Weight boxplots') + xlab("") + ylab("") + theme(legend.position="none", plot.title = element_text(size=7, hjust = 0.5, face = "bold"), axis.text.x=element_text(angle=90, vjust=0.5))
+
+#Cleaning for obvious Height outlier
+abalone <- subset(abalone, abalone$Height<150)
+
+#Pair scatterplots to visualise the relationship between the variables
+ggpairs(abalone, columns = 2:8, title="Figure 1:Pair plots of variables categorised by GenderMat", ggplot2::aes(color=GenderMat), axisLabels = "none", switch = "both", upper = list(continuous = wrap("cor", size=3)))
+
+#Initial model using all weight variables as predictors and residual plot
+WModel1<-lm(Shucked_weight~Whole_weight+Viscera_weight+Shell_weight,data = abalone)
+plot(fitted(WModel1), residuals(WModel1), main = "Model 1 residual plot", xlab = "Fitted values", ylab = "Residuals", cex.main=0.75, cex.lab=0.7, cex.axis=0.5)
+abline(0,0, col="red", lty="dotted")
+
+#Breusch-Pagan test for Model1
+ncvTest(WModel1)
+
+#Model 2 and residual plot
+w <- 1/(abalone$Shell_weight)^2
+WModel2<-lm(Shucked_weight~Whole_weight+Viscera_weight+Shell_weight,data = abalone, weights = w)
+
+plot(fitted(WModel2), rstandard(WModel2), main = "Model 2 residual plot", xlab = "Fitted values", ylab = "Standardised Residuals", cex.main=0.75, cex.lab=0.7, cex.axis=0.5)
+abline(0,0, col="red", lty="dotted")
+
+#Summary table Model 2
+kable(summary(WModel2)$coefficients, caption = "Coefficients summary of Model 2", booktabs = T)  %>%
+kable_styling(latex_options = c("striped", "hold_position"), font_size = 7.5)
+
+#Model 3 and residual plot
+Model3<-lm(Shucked_weight~Length+Diameter+Height,data = abalone)
+plot(fitted(Model3), rstandard(Model3), main = "Model 3 residual plot", xlab = "Fitted values", ylab = "Standardised Residuals", cex.main=0.75, cex.lab=0.7, cex.axis=0.5)
+abline(0,0, col="red", lty="dotted")
+
+#Box Tidwell transformation
+boxTidwell(Shucked_weight~Length+Diameter+Height,data = abalone)
+
+#Model 4 and residual plot
+Model4<-lm(log(Shucked_weight)~Length+I(Length^2)+I(Length^3)+Diameter+I(Diameter^2)+I(Diameter^3)+I(Diameter^4)+Height,data = abalone)
+plot(fitted(Model4), rstandard(Model4), main = "Model 4 residual plot", xlab = "Fitted values", ylab = "Standardised Residuals", cex.main=0.75, cex.lab=0.7, cex.axis=0.5)
+abline(0,0, col="red", lty="dotted")
+
+#Model 4 summary tabel
+kable(summary(Model4)$coefficients, caption = "Coefficients summary of Model 4", booktabs = T)  %>%
+kable_styling(latex_options = c("striped", "hold_position"), font_size = 7.5)
+
+#Gender and maturity dummy variables
+Gender <- ifelse(abalone$GenderMat=="F",1,0)
+Maturity <- ifelse(abalone$GenderMat== c("F","M"),1,0)
+Maturity <- factor(Maturity, levels = c(0,1), labels = c("Infant", "Adult"))
+abalone <- cbind(abalone, Gender, Maturity)
+
+#Model 5 and residual plot
+Model5 <-lm(Shucked_weight~Length+I(Length^2)+I(Length^3)+Diameter+I(Diameter^2)+I(Diameter^3)+I(Diameter^4)+Height+Whole_weight+Viscera_weight+Shell_weight+Gender+Maturity,data = abalone, weights = w)
+plot(fitted(Model5), rstandard(Model5), main = "Model 5 standard residual plot", xlab = "Fitted values", ylab = "Standardised Residuals", cex.main=0.75, cex.lab=0.7, cex.axis=0.5)
+abline(0,0, col="red", lty="dotted")
+
+#Model 5 summary table
+kable(summary(Model5)$coefficients, caption = "Coefficients summary of Model 5", booktabs = T)  %>%
+kable_styling(latex_options = c("striped", "hold_position"), font_size = 7.5)
+
+#Model 6 and summary table
+Model6<-lm(Shucked_weight~Length+I(Length^2)+Height+Whole_weight+Viscera_weight+Shell_weight+Gender,data = abalone,weights = w)
+kable(summary(Model6)$coefficients, caption = "Coefficients summary of Model 6", booktabs = T)  %>%
+kable_styling(latex_options = c("striped", "hold_position"), font_size = 7.5)
