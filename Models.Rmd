@@ -1,6 +1,6 @@
 ---
-title: "ST404 Assignment 3"
-author: "Student ID: 1714796"
+title: "Bike Data"
+author: "Felix Ben-Eghan"
 output: pdf_document
 linestretch: 1.5
 fontsize: 11pt
